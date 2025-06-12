@@ -1,19 +1,28 @@
-import express from 'express';
+import express, { Request, Response } from 'express';
 import dotenv from 'dotenv';
 import { getAuthUrl, getTokens, oauth2Client } from './oauth';
 import { startImapSync } from './imap-sync';
+import { es, ensureIndex, indexEmail } from './elasticsearch';
 
 dotenv.config();
 const app = express();
+app.use(express.json());
+
 const PORT = process.env.PORT || 3000;
 
-// 1) Return OAuth URL
-app.get('/auth-url', (_req, res) => {
+// 1️⃣ Ensure the ES index exists
+ensureIndex().catch(console.error);
+
+// 2️⃣ In-memory token store
+const userTokens: Record<string,string> = {};
+
+// 3️⃣ OAuth URL endpoint
+app.get('/auth-url', (_req: Request, res: Response) => {
     res.json({ url: getAuthUrl() });
 });
 
-// 2) OAuth2 callback
-app.get('/oauth2callback', async (req, res) => {
+// 4️⃣ OAuth2 callback
+app.get('/oauth2callback', async (req: Request, res: Response) => {
     const code = req.query.code as string | undefined;
     if (!code) {
         res.status(400).send('Missing code');
@@ -24,7 +33,7 @@ app.get('/oauth2callback', async (req, res) => {
         const tokens = await getTokens(code);
         oauth2Client.setCredentials(tokens);
 
-        // Extract email from ID token
+        // Extract user email
         let email = 'unknown';
         if (tokens.id_token) {
             const payload = JSON.parse(
@@ -32,13 +41,14 @@ app.get('/oauth2callback', async (req, res) => {
             );
             email = payload.email || 'unknown';
         }
-        console.log(`✅ Stored token for: ${email}`);
+        userTokens[email] = tokens.access_token!;
 
         // Build XOAUTH2 auth string
         const authString = Buffer.from(
             `user=${email}\x01auth=Bearer ${tokens.access_token}\x01\x01`
         ).toString('base64');
 
+        // Start IMAP sync and index each email
         startImapSync({
             user: email,
             xoauth2: authString,
@@ -46,16 +56,65 @@ app.get('/oauth2callback', async (req, res) => {
             port: 993,
             tls: true,
             accountName: email
-        }, emailObj => {
-            console.log(`[${email}] New Email: ${emailObj.subject}`);
+        }, async emailObj => {
+            console.log(`[${email}] Received: ${emailObj.subject}`);
+            await indexEmail(emailObj);
+            console.log(`[${email}] Indexed: ${emailObj.subject}`);
         });
 
-        res.send(`Now syncing email for ${email}`);
+        res.send(`Connected & syncing ${email}`);
     } catch (err) {
         console.error('OAuth callback error:', err);
         res.status(500).send('OAuth failed.');
     }
 });
+
+// 5️⃣ Search endpoint
+
+
+app.get('/search', async (req: Request, res: Response) => {
+    const q       = (req.query.q       as string | undefined) || '';
+    const account = (req.query.account as string | undefined);
+
+    // Build the "must" clause: either multi_match or match_all
+    const mustClause = q
+        ? { multi_match: { query: q, fields: ['subject', 'body'] } }
+        : { match_all: {} };
+
+    // Optional "filter" clause on the account field
+    const filterClause = account
+        ? { term: { account } }
+        : undefined;
+
+    // Combine into a bool query
+    const esQuery: Record<string, any> = {
+        bool: {
+            must: mustClause,
+            ...(filterClause ? { filter: filterClause } : {})
+        }
+    };
+
+    try {
+        // Execute the search, sorted by date ascending
+        const result = await es.search({
+            index: 'emails',
+            body: {
+                query: esQuery,
+                sort:  [{ date: { order: 'asc' } }]
+            }
+        });
+
+        // Extract the _source documents
+        const hits = (result.body as any).hits.hits.map((h: any) => h._source);
+        res.json(hits);
+    } catch (err) {
+        console.error('Search error:', err);
+        res.status(500).send('Search failed');
+    }
+});
+
+// ... your other routes and app.listen() ...
+
 
 app.listen(PORT, () => {
     console.log(`🚀 Server listening at http://localhost:${PORT}`);

@@ -2,7 +2,7 @@ import { google } from 'googleapis';
 import dotenv from 'dotenv';
 dotenv.config();
 
-const { CLIENT_ID, CLIENT_SECRET, REDIRECT_URI } = process.env;
+const { CLIENT_ID, CLIENT_SECRET, REDIRECT_URI } = process.env!;
 
 export const SCOPES = [
     'https://mail.google.com/',
@@ -12,9 +12,9 @@ export const SCOPES = [
 ];
 
 export const oauth2Client = new google.auth.OAuth2(
-    CLIENT_ID,
-    CLIENT_SECRET,
-    REDIRECT_URI
+    CLIENT_ID!,
+    CLIENT_SECRET!,
+    REDIRECT_URI!
 );
 
 export function getAuthUrl(): string {

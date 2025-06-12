@@ -11,30 +11,43 @@ export interface ImapConfig {
     accountName: string;
 }
 
-export function startImapSync(config: ImapConfig, onEmail: (email: any) => void) {
+export function startImapSync(
+    config: ImapConfig,
+    onEmail: (email: {
+        account: string;
+        subject: string;
+        from: string;
+        to: string;
+        body: string;
+        date?: Date;
+    }) => void
+) {
     const imap = new Imap({
         user: config.user,
-        password: '',              // required by types
+        password: '',
         xoauth2: config.xoauth2,
         host: config.host,
         port: config.port,
         tls: config.tls,
-        tlsOptions: { rejectUnauthorized: false }
+        tlsOptions: { rejectUnauthorized: false },
     });
+
+    let currentTotal = 0;
 
     imap.once('ready', () => {
         console.log(`[${config.accountName}] Connected to IMAP`);
-
-        imap.openBox('INBOX', false, (err) => {
+        imap.openBox('INBOX', false, (err, box) => {
             if (err) throw err;
 
-            // --- FETCH LAST 30 DAYS ---
-            const sinceDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-            // Pass a single array where each criterion is itself an array:
-            imap.search([ ['SINCE', sinceDate] ], (err, uids) => {
-                if (err) return console.error('Search error:', err);
-                if (!uids || uids.length === 0) return;
+            // Record the current total message count
+            currentTotal = box.messages.total;
 
+            // 1️⃣ Initial fetch: last 30 days (bootstrap, optional markSeen)
+            const sinceDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+            imap.search([[ 'SINCE', sinceDate ]], (err, uids) => {
+                if (err) return console.error('Initial search error:', err);
+                if (!uids?.length) return;
+                // Fetch all those bootstrap messages
                 const f = imap.fetch(uids, { bodies: '' });
                 f.on('message', msg => {
                     msg.on('body', stream => {
@@ -45,43 +58,47 @@ export function startImapSync(config: ImapConfig, onEmail: (email: any) => void)
                                 subject: parsed.subject || '',
                                 from: parsed.from?.text || '',
                                 to: Array.isArray(parsed.to)
-                                    ? parsed.to.map(t => (t as any).address || '').join(', ')
+                                    ? parsed.to.map(t => (t as any).address).join(', ')
                                     : (parsed.to as any)?.address || '',
-                                body: parsed.text || ''
+                                body: parsed.text || '',
+                                date: parsed.date || new Date(),
                             });
                         });
                     });
                 });
             });
 
-            // --- REAL-TIME UPDATES (IDLE) ---
-            imap.on('mail', () => {
-                console.log(`[${config.accountName}] New mail`);
-                // Re-use the same search pattern for unseen messages
-                imap.search([ 'UNSEEN' ], (err, results) => {
-                    if (err) return console.error('Search error:', err);
-                    if (!results || results.length === 0) return;
+            // 2️⃣ Real-time: on new mail, fetch only that range
+            imap.on('mail', (numNewMsgs: number) => {
+                console.log(
+                    `[${config.accountName}] Mail event: ${numNewMsgs} new message(s)`
+                );
+                if (numNewMsgs <= 0) return;
 
-                    const f2 = imap.fetch(results, { bodies: '' });
-                    f2.on('message', msg => {
-                        msg.on('body', stream => {
-                            simpleParser(stream as Readable, (_err, parsed) => {
-                                if (_err) return console.error('Parse error:', _err);
-                                onEmail({
-                                    account: config.accountName,
-                                    subject: parsed.subject || '',
-                                    from: parsed.from?.text || '',
-                                    to: Array.isArray(parsed.to)
-                                        ? parsed.to.map(t => (t as any).address || '').join(', ')
-                                        : (parsed.to as any)?.address || '',
-                                    body: parsed.text || ''
-                                });
+                // Compute the sequence range: (total - new + 1) to total
+                const startSeq = currentTotal + 1;
+                currentTotal += numNewMsgs;
+                const range = `${startSeq}:${currentTotal}`;
+
+                const f2 = imap.seq.fetch(range, { bodies: '' });
+                f2.on('message', msg => {
+                    msg.on('body', stream => {
+                        simpleParser(stream as Readable, (_err, parsed) => {
+                            if (_err) return console.error('Parse error:', _err);
+                            onEmail({
+                                account: config.accountName,
+                                subject: parsed.subject || '',
+                                from: parsed.from?.text || '',
+                                to: Array.isArray(parsed.to)
+                                    ? parsed.to.map(t => (t as any).address).join(', ')
+                                    : (parsed.to as any)?.address || '',
+                                body: parsed.text || '',
+                                date: parsed.date || new Date(),
                             });
                         });
                     });
                 });
             });
-
         });
     });
 

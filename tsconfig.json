@@ -1,12 +1,12 @@
 {
   "compilerOptions": {
-    "target": "ES2020",                // Modern JS features
-    "module": "commonjs",              // Node.js module system
-    "strict": true,                    // Enable all strict checks
-    "esModuleInterop": true,           // Import compatibility
+    "target": "es2016",
+    "module": "commonjs",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "skipLibCheck": true,              // Faster builds
-    "outDir": "dist"                   // Output directory
+    "outDir": "dist"
   },
   "include": ["src/**/*"]
 }
