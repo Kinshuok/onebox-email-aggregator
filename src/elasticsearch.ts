@@ -8,7 +8,7 @@ export const es = new Client({
 
 export async function ensureIndex() {
     const index = 'emails';
-    const exists = await es.indices.exists({ index });
+    const { body: exists } = await es.indices.exists({ index });
     if (!exists) {
         await es.indices.create({
             index,
