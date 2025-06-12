@@ -19,8 +19,9 @@ export async function ensureIndex() {
                         subject: { type: 'text'    },
                         from:    { type: 'keyword' },
                         to:      { type: 'keyword' },
-                        body:    { type: 'text'    },
-                        date:    { type: 'date'    }
+                        body:     { type: 'text'    },
+                        date:     { type: 'date'    },
+                        category: { type: 'keyword' }
                     }
                 }
             }
@@ -36,6 +37,7 @@ export async function indexEmail(email: {
     to: string;
     body: string;
     date?: Date;
+    category?: string;
 }) {
     await es.index({
         index: 'emails',
@@ -44,8 +46,9 @@ export async function indexEmail(email: {
             subject: email.subject,
             from:    email.from,
             to:      email.to,
-            body:    email.body,
-            date:    email.date || new Date()
+            body:     email.body,
+            date:     email.date || new Date(),
+            category: email.category || 'Uncategorized'
         }
     });
 }
