@@ -3,6 +3,8 @@ import dotenv from 'dotenv';
 import { getAuthUrl, getTokens, oauth2Client } from './oauth';
 import { startImapSync } from './imap-sync';
 import { es, ensureIndex, indexEmail } from './elasticsearch';
+import { categorizeEmail } from './ai';
+import { notifyInterested } from './notify';
 
 dotenv.config();
 const app = express();
@@ -58,8 +60,12 @@ app.get('/oauth2callback', async (req: Request, res: Response) => {
             accountName: email
         }, async emailObj => {
             console.log(`[${email}] Received: ${emailObj.subject}`);
-            await indexEmail(emailObj);
-            console.log(`[${email}] Indexed: ${emailObj.subject}`);
+            const category = await categorizeEmail(emailObj.body);
+            await indexEmail({ ...emailObj, category });
+            if (category === 'Interested') {
+                await notifyInterested(emailObj);
+            }
+            console.log(`[${email}] Indexed: ${emailObj.subject} (${category})`);
         });
 
         res.send(`Connected & syncing ${email}`);
@@ -73,24 +79,29 @@ app.get('/oauth2callback', async (req: Request, res: Response) => {
 
 
 app.get('/search', async (req: Request, res: Response) => {
-    const q       = (req.query.q       as string | undefined) || '';
-    const account = (req.query.account as string | undefined);
+    const q        = (req.query.q        as string | undefined) || '';
+    const account  = (req.query.account  as string | undefined);
+    const category = (req.query.category as string | undefined);
 
     // Build the "must" clause: either multi_match or match_all
     const mustClause = q
         ? { multi_match: { query: q, fields: ['subject', 'body'] } }
         : { match_all: {} };
 
-    // Optional "filter" clause on the account field
-    const filterClause = account
-        ? { term: { account } }
-        : undefined;
+    // Optional "filter" clauses
+    const filters: any[] = [];
+    if (account) {
+        filters.push({ term: { account } });
+    }
+    if (category) {
+        filters.push({ term: { category } });
+    }
 
     // Combine into a bool query
     const esQuery: Record<string, any> = {
         bool: {
             must: mustClause,
-            ...(filterClause ? { filter: filterClause } : {})
+            ...(filters.length ? { filter: filters } : {})
         }
     };
 
