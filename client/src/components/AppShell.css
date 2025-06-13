@@ -1,0 +1,38 @@
+.app-shell {
+  color: #fff;
+  background-color: #121212;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+.app-header {
+  padding: 1rem;
+  background: #1f1f1f;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.app-body {
+  flex: 1;
+  display: flex;
+}
+.sidebar {
+  width: 200px;
+  background: #191919;
+  padding: 1rem;
+}
+.sidebar ul {
+  list-style: none;
+  padding: 0;
+}
+.sidebar li {
+  margin-bottom: 0.5rem;
+}
+.sidebar a {
+  color: #8ab4f8;
+  text-decoration: none;
+}
+.content {
+  flex: 1;
+  padding: 1rem;
+}

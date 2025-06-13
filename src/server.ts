@@ -1,6 +1,7 @@
 // src/server.ts
 import express, { Request, Response, NextFunction } from 'express';
 import dotenv from 'dotenv';
+import path from 'path';
 import { getAuthUrl, getTokens, oauth2Client } from './oauth';
 import { startImapSync } from './imap-sync';
 import { es, ensureIndex, indexEmail } from './elasticsearch';
@@ -10,11 +11,18 @@ import { notifyInterested } from './notify';
 dotenv.config();
 const app = express();
 app.use(express.json());
+app.use(express.static(path.join(__dirname, '../client/dist')));
+
+const connectedAccounts = new Set<string>();
 
 const PORT = process.env.PORT || 3000;
 
 (async () => {
     await ensureIndex();
+
+    app.get('/accounts', (_req, res) => {
+        res.json(Array.from(connectedAccounts));
+    });
 
     app.get('/auth-url', (_req, res) => {
         res.json({ url: getAuthUrl() });
@@ -68,6 +76,8 @@ const PORT = process.env.PORT || 3000;
                     }
                 );
 
+                connectedAccounts.add(email);
+
                 res.send(`Connected & syncing ${email}`);
             } catch (err) {
                 // forward to error handler
@@ -102,6 +112,10 @@ const PORT = process.env.PORT || 3000;
             console.error('Search error:', err);
             res.status(500).send('Search failed');
         }
+    });
+
+    app.get('*', (_req, res) => {
+        res.sendFile(path.join(__dirname, '../client/dist/index.html'));
     });
 
     app.listen(PORT, () => {

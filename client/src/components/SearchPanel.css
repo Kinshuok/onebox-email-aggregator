@@ -1,0 +1,16 @@
+.search-panel {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+.search-panel input,
+.search-panel select,
+.search-panel button {
+  padding: 0.4rem 0.6rem;
+  background: #222;
+  border: 1px solid #444;
+  color: #fff;
+}
+.connect {
+  margin-right: auto;
+}

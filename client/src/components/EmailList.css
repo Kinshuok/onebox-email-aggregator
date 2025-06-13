@@ -1,0 +1,32 @@
+.email-list {
+  list-style: none;
+  padding: 0;
+}
+.email-item {
+  padding: 0.5rem;
+  border-bottom: 1px solid #333;
+}
+.summary {
+  cursor: pointer;
+}
+.body {
+  display: none;
+  white-space: pre-wrap;
+  margin-top: 0.5rem;
+}
+.email-item.open .body {
+  display: block;
+}
+.badge {
+  background: #444;
+  padding: 0 0.3rem;
+  margin-left: 0.5rem;
+  border-radius: 0.25rem;
+}
+.spinner {
+  margin-bottom: 1rem;
+}
+.error {
+  color: tomato;
+  margin-bottom: 1rem;
+}
