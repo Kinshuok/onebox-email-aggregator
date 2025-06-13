@@ -4,7 +4,7 @@ import dotenv from 'dotenv';
 import { getAuthUrl, getTokens, oauth2Client } from './oauth';
 import { startImapSync } from './imap-sync';
 import { es, ensureIndex, indexEmail } from './elasticsearch';
-import { categorizeEmail } from './ai';
+import { categorizeEmails } from './ai';
 import { notifyInterested } from './notify';
 
 dotenv.config();
@@ -12,6 +12,42 @@ const app = express();
 app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
+
+const BATCH_SIZE = parseInt(process.env.BATCH_SIZE || '5', 10);
+const BATCH_INTERVAL = parseInt(process.env.BATCH_INTERVAL || '5000', 10);
+
+interface QueuedEmail {
+    account: string;
+    subject: string;
+    from: string;
+    to: string;
+    body: string;
+    date?: Date;
+}
+
+const queue: QueuedEmail[] = [];
+let processing = false;
+
+async function processQueue() {
+    if (processing || queue.length === 0) return;
+    processing = true;
+    const batch = queue.splice(0, BATCH_SIZE);
+    const labels = await categorizeEmails(
+        batch.map(e => ({ subject: e.subject, body: e.body }))
+    );
+    for (let i = 0; i < batch.length; i++) {
+        const emailObj = batch[i];
+        const category = labels[i];
+        await indexEmail({ ...emailObj, category });
+        if (category === 'Interested') {
+            await notifyInterested(emailObj);
+        }
+        console.log(`✉️  ${emailObj.subject} (${category})`);
+    }
+    processing = false;
+}
+
+setInterval(processQueue, BATCH_INTERVAL);
 
 // 1️⃣ Ensure the ES index exists (with category mapping)
 ensureIndex().catch(console.error);
@@ -62,22 +98,10 @@ app.get('/oauth2callback', async (req, res) => {
                 accountName: email
             },
             async (emailObj) => {
-                // 1. Classify
-                const category = await categorizeEmail(
-                    emailObj.subject,
-                    emailObj.body
-                );
-
-                // 2. Index into Elasticsearch
-                await indexEmail({ ...emailObj, category });
-
-                // 3. Optional notification if user is Interested
-                if (category === 'Interested') {
-                    await notifyInterested(emailObj);
+                queue.push(emailObj);
+                if (queue.length >= BATCH_SIZE) {
+                    processQueue();
                 }
-
-                // 4. Log exactly: Subject (Label)
-                console.log(`✉️  ${emailObj.subject} (${category})`);
             }
         );
 
