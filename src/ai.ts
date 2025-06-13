@@ -1,12 +1,18 @@
 // src/ai.ts
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import Groq from 'groq-sdk';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
-const apiKey = process.env.GEMINI_API_KEY || '';
-// Pass the raw string key, not an object
-const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : undefined;
+// Configure the Groq Cloud API parameters. You can obtain an API key by
+// creating a project at https://console.groq.com/home
+const apiKey = process.env.GROQ_API_KEY || '';
+const apiUrl = process.env.GROQ_API_URL;
+const model  = process.env.GROQ_MODEL  || 'groq-1';
+
+const groq = apiKey
+    ? new Groq({ apiKey, baseURL: apiUrl })
+    : undefined;
 
 // Your fixed set of labels
 const VALID = [
@@ -17,60 +23,60 @@ const VALID = [
     'Out of Office'
 ];
 
+export async function categorizeEmails(
+    emails: { subject: string; body: string }[]
+): Promise<string[]> {
+    if (!groq) {
+        emails.forEach(e => console.log(`✉️ ${e.subject} (Uncategorized)`));
+        return emails.map(() => 'Uncategorized');
+    }
+
+    const systemPrompt = [
+        'You are an email classification assistant.',
+        'Classify each email into exactly one of these labels:',
+        '- Interested',
+        '- Meeting Booked',
+        '- Not Interested',
+        '- Spam',
+        '- Out of Office',
+        '',
+        'Reply with one label per line in the same order as the emails.'
+    ].join('\n');
+
+    const userPrompt = emails
+        .map((e, i) => `Email ${i + 1}:\n${e.body}`)
+        .join('\n\n');
+
+    try {
+        const response = await groq.chat.completions.create({
+            model,
+            messages: [
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: userPrompt }
+            ],
+            temperature: 0
+        });
+
+        const text: string = response.choices?.[0]?.message?.content || '';
+        const lines = text.trim().split(/\n+/);
+
+        return emails.map((e, i) => {
+            const raw = lines[i] || '';
+            const label = VALID.includes(raw) ? raw : 'Uncategorized';
+            console.log(`✉️ ${e.subject} (${label})`);
+            return label;
+        });
+    } catch (err) {
+        console.error('AI categorization failed:', err);
+        emails.forEach(e => console.log(`✉️ ${e.subject} (Uncategorized)`));
+        return emails.map(() => 'Uncategorized');
+    }
+}
+
 export async function categorizeEmail(
     subject: string,
     body: string
 ): Promise<string> {
-    if (!genAI) {
-        console.log(`✉️ ${subject} (Uncategorized)`);
-        return 'Uncategorized';
-    }
-
-    const prompt = `
-You are an email classification assistant.
-Classify the following email into exactly one of these labels:
-- Interested
-- Meeting Booked
-- Not Interested
-- Spam
-- Out of Office
-
-Reply with exactly the label and nothing else.
-
-Examples:
-Email: "Hey team, can we book a meeting for next Tuesday? Thanks!"
-→ Meeting Booked
-
-Email: "I’m very interested in your product. Let’s talk next steps."
-→ Interested
-
-Email: "Win a free iPad now!!! Click here"
-→ Spam
-
-Email: "I’m out of office until Monday, please contact my colleague."
-→ Out of Office
-
-Now classify this email:
-
-Email:
-${body}
-
-→`.trim();
-
-    try {
-        // Use the Flash preview model you confirmed earlier
-        const model = genAI.getGenerativeModel({
-            model: 'models/gemini-2.5-flash-preview-05-20'
-        });
-        const result = await model.generateContent(prompt);
-        const raw = result.response.text().trim();
-        const label = VALID.includes(raw) ? raw : 'Uncategorized';
-
-        console.log(`✉️ ${subject} (${label})`);
-        return label;
-    } catch (err) {
-        console.error('AI categorization failed:', err);
-        console.log(`✉️ ${subject} (Uncategorized)`);
-        return 'Uncategorized';
-    }
+    const [label] = await categorizeEmails([{ subject, body }]);
+    return label;
 }
