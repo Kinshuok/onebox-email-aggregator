@@ -4,9 +4,9 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-const apiKey = process.env.GROK_API_KEY || '';
-const apiUrl = process.env.GROK_API_URL || 'https://api.grok.com/v1/chat/completions';
-const model  = process.env.GROK_MODEL  || 'grok-1';
+const apiKey = process.env.GROQ_API_KEY || '';
+const apiUrl = process.env.GROQ_API_URL || 'https://api.groq.com/v1/chat/completions';
+const model  = process.env.GROQ_MODEL  || 'groq-1';
 
 // Your fixed set of labels
 const VALID = [
