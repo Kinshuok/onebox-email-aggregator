@@ -1,85 +1,75 @@
 // src/ai.ts
-import axios from 'axios';
 import dotenv from 'dotenv';
+import Groq from 'groq-sdk';
 
 dotenv.config();
 
-const apiKey = process.env.GROK_API_KEY || '';
-const apiUrl = process.env.GROK_API_URL || 'https://api.grok.com/v1/chat/completions';
-const model  = process.env.GROK_MODEL  || 'grok-1';
+const apiKey = process.env.GROQ_API_KEY;
+if (!apiKey) {
+    console.warn(
+        '[⚠️] GROQ_API_KEY not set—calls to categorizeEmail will be no-ops.'
+    );
+}
 
-// Your fixed set of labels
+const client = new Groq({
+    apiKey,
+    // apiUrl: process.env.GROQ_API_URL,
+});
+
 const VALID = [
     'Interested',
     'Meeting Booked',
     'Not Interested',
     'Spam',
-    'Out of Office'
-];
+    'Out of Office',
+] as const;
 
-export async function categorizeEmails(
-    emails: { subject: string; body: string }[]
-): Promise<string[]> {
+type Label = (typeof VALID)[number] | 'Uncategorized';
+
+/**
+ * Classify a single email into one of the VALID labels.
+ */
+export async function categorizeEmail(
+    subject: string,
+    body: string
+): Promise<Label> {
     if (!apiKey) {
-        emails.forEach(e => console.log(`✉️ ${e.subject} (Uncategorized)`));
-        return emails.map(() => 'Uncategorized');
+        console.log(`✉️ ${subject} → Uncategorized`);
+        return 'Uncategorized';
     }
 
     const systemPrompt = [
         'You are an email classification assistant.',
-        'Classify each email into exactly one of these labels:',
-        '- Interested',
-        '- Meeting Booked',
-        '- Not Interested',
-        '- Spam',
-        '- Out of Office',
+        'Classify the following email into exactly one of these labels:',
+        ...VALID.map(l => `- ${l}`),
         '',
-        'Reply with one label per line in the same order as the emails.'
+        'Reply with only the label name.',
     ].join('\n');
 
-    const userPrompt = emails
-        .map((e, i) => `Email ${i + 1}:\n${e.body}`)
-        .join('\n\n');
+    const userPrompt = [
+        `Subject: ${subject}`,
+        '',
+        `Body:\n${body}`,
+    ].join('\n');
 
     try {
-        const { data } = await axios.post(
-            apiUrl,
-            {
-                model,
-                messages: [
-                    { role: 'system', content: systemPrompt },
-                    { role: 'user', content: userPrompt }
-                ],
-                temperature: 0
-            },
-            {
-                headers: {
-                    Authorization: `Bearer ${apiKey}`,
-                    'Content-Type': 'application/json'
-                }
-            }
-        );
-
-        const text: string = data.choices?.[0]?.message?.content || '';
-        const lines = text.trim().split(/\n+/);
-
-        return emails.map((e, i) => {
-            const raw = lines[i] || '';
-            const label = VALID.includes(raw) ? raw : 'Uncategorized';
-            console.log(`✉️ ${e.subject} (${label})`);
-            return label;
+        const res = await client.chat.completions.create({
+            model: process.env.GROQ_MODEL || 'grok-1',
+            messages: [
+                { role: 'system', content: systemPrompt },
+                { role: 'user',   content: userPrompt },
+            ],
+            temperature: 0,
         });
+
+        const raw = res.choices?.[0]?.message?.content?.trim() || '';
+        const label = VALID.includes(raw as any) ? raw : 'Uncategorized';
+        console.log(`✉️ ${subject} → ${label}`);
+        return label as Label;
+
     } catch (err) {
         console.error('AI categorization failed:', err);
-        emails.forEach(e => console.log(`✉️ ${e.subject} (Uncategorized)`));
-        return emails.map(() => 'Uncategorized');
+        console.log(`✉️ ${subject} → Uncategorized`);
+        return 'Uncategorized';
     }
-}
-
-export async function categorizeEmail(
-    subject: string,
-    body: string
-): Promise<string> {
-    const [label] = await categorizeEmails([{ subject, body }]);
-    return label;
 }

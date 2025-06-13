@@ -1,32 +1,33 @@
+// src/elasticsearch.ts
 import { Client } from '@elastic/elasticsearch';
 import dotenv from 'dotenv';
 dotenv.config();
 
 export const es = new Client({
-    node: process.env.ELASTIC_URL || 'http://localhost:9200'
+    node: process.env.ELASTIC_URL || 'http://localhost:9200',
 });
 
-export async function ensureIndex() {
+export async function ensureIndex(): Promise<void> {
     const index = 'emails';
-    const { body: exists } = await es.indices.exists({ index });
-    if (!exists) {
+    const exists = await es.indices.exists({ index });
+    if (!exists.body) {
         await es.indices.create({
             index,
             body: {
                 mappings: {
                     properties: {
-                        account: { type: 'keyword' },
-                        subject: { type: 'text'    },
-                        from:    { type: 'keyword' },
-                        to:      { type: 'keyword' },
+                        account:  { type: 'keyword' },
+                        subject:  { type: 'text'    },
+                        from:     { type: 'keyword' },
+                        to:       { type: 'keyword' },
                         body:     { type: 'text'    },
                         date:     { type: 'date'    },
-                        category: { type: 'keyword' }
+                        category: { type: 'keyword' }   // ensure this is present
                     }
                 }
             }
         });
-        console.log('📑 Elasticsearch index created:', index);
+        console.log(`📑 Created index ${index}`);
     }
 }
 
@@ -38,17 +39,17 @@ export async function indexEmail(email: {
     body: string;
     date?: Date;
     category?: string;
-}) {
+}): Promise<void> {
     await es.index({
         index: 'emails',
         body: {
-            account: email.account,
-            subject: email.subject,
-            from:    email.from,
-            to:      email.to,
+            account:  email.account,
+            subject:  email.subject,
+            from:     email.from,
+            to:       email.to,
             body:     email.body,
             date:     email.date || new Date(),
-            category: email.category || 'Uncategorized'
-        }
+            category: email.category || 'Uncategorized',
+        },
     });
 }

@@ -35,24 +35,22 @@ export function startImapSync(
     let currentTotal = 0;
 
     imap.once('ready', () => {
-        console.log(`[${config.accountName}] Connected to IMAP`);
+        console.log(`🔌 [${config.accountName}] IMAP ready`);
         imap.openBox('INBOX', false, (err, box) => {
             if (err) throw err;
-
-            // Record the current total message count
             currentTotal = box.messages.total;
 
-            // 1️⃣ Initial fetch: last 30 days (bootstrap, optional markSeen)
-            const sinceDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-            imap.search([[ 'SINCE', sinceDate ]], (err, uids) => {
-                if (err) return console.error('Initial search error:', err);
+            // Bootstrap last 30 days
+            const sinceDate = new Date(Date.now());
+            sinceDate.setHours(11, 0, 0, 0);
+            imap.search([['SINCE', sinceDate]], (err, uids) => {
+                if (err) return console.error(err);
                 if (!uids?.length) return;
-                // Fetch all those bootstrap messages
                 const f = imap.fetch(uids, { bodies: '' });
                 f.on('message', msg => {
                     msg.on('body', stream => {
                         simpleParser(stream as Readable, (_err, parsed) => {
-                            if (_err) return console.error('Parse error:', _err);
+                            if (_err) return console.error(_err);
                             onEmail({
                                 account: config.accountName,
                                 subject: parsed.subject || '',
@@ -68,23 +66,17 @@ export function startImapSync(
                 });
             });
 
-            // 2️⃣ Real-time: on new mail, fetch only that range
-            imap.on('mail', (numNewMsgs: number) => {
-                console.log(
-                    `[${config.accountName}] Mail event: ${numNewMsgs} new message(s)`
-                );
-                if (numNewMsgs <= 0) return;
-
-                // Compute the sequence range: (total - new + 1) to total
+            // Real-time updates
+            imap.on('mail', (numNew: number) => {
+                if (numNew <= 0) return;
                 const startSeq = currentTotal + 1;
-                currentTotal += numNewMsgs;
+                currentTotal += numNew;
                 const range = `${startSeq}:${currentTotal}`;
-
                 const f2 = imap.seq.fetch(range, { bodies: '' });
                 f2.on('message', msg => {
                     msg.on('body', stream => {
                         simpleParser(stream as Readable, (_err, parsed) => {
-                            if (_err) return console.error('Parse error:', _err);
+                            if (_err) return console.error(_err);
                             onEmail({
                                 account: config.accountName,
                                 subject: parsed.subject || '',
@@ -102,12 +94,11 @@ export function startImapSync(
         });
     });
 
-    imap.once('error', (err: Error) => {
-        console.error(`[${config.accountName}] IMAP error:`, err);
+    imap.once('error', (err:Error) => {
+        console.error(`❌ [${config.accountName}] IMAP error`, err);
     });
-
     imap.once('end', () => {
-        console.log(`[${config.accountName}] IMAP connection ended.`);
+        console.log(`⚠️ [${config.accountName}] IMAP connection ended`);
     });
 
     imap.connect();
