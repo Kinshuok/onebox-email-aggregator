@@ -13,10 +13,13 @@ export default function AccountSelector({
         <div className="flex items-center space-x-2 mb-4">
             <select
                 className="border px-2 py-1 rounded"
-                value={selected || ""}
+                value={selected ?? ''}
                 onChange={(e) => onSelect(e.target.value)}
             >
                 {accounts.length === 0 && <option value="">No accounts</option>}
+                {accounts.length > 1 && (
+                    <option value="">All accounts</option>
+                )}
                 {accounts.map((acc) => (
                     <option key={acc} value={acc}>
                         {acc}

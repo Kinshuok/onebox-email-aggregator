@@ -59,6 +59,12 @@ button {
 .space-y-2 > * + * {
     margin-top: 0.5rem;
 }
+.text-blue-600 {
+    color: #2563eb;
+}
+.underline {
+    text-decoration: underline;
+}
 .border {
     border: 1px solid #d1d5db;
 }

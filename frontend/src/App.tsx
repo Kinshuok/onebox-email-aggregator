@@ -32,15 +32,21 @@ function App() {
             }
             setAccount(acc);
         } else if (stored.length > 0) {
-            setAccount(stored[0]);
+            setAccount(stored.length > 1 ? "" : stored[0]);
         }
 
         setAccounts(stored);
     }, []);
 
     useEffect(() => {
-        if (!account) return;
-        const url = `/search?account=${account}&q=${search}` + (category ? `&category=${encodeURIComponent(category)}` : "");
+        if (account === null) return;
+
+        const params = new URLSearchParams();
+        if (account) params.append("account", account);
+        if (search) params.append("q", search);
+        if (category) params.append("category", category);
+
+        const url = `/search?${params.toString()}`;
         fetch(url)
             .then(res => res.json())
             .then(data => setEmails(data))
@@ -51,7 +57,7 @@ function App() {
         <div className="p-6 max-w-5xl mx-auto">
             <h1 className="text-2xl font-bold mb-4">📬 Your Onebox Emails</h1>
 
-            {!account && accounts.length === 0 ? (
+            {account === null && accounts.length === 0 ? (
                 <ConnectAccountButton />
             ) : (
                 <>
