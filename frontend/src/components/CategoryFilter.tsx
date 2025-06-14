@@ -1,11 +1,4 @@
-export const CATEGORIES = [
-    'Interested',
-    'Meeting Booked',
-    'Not Interested',
-    'Spam',
-    'Out of Office',
-    'Uncategorized',
-];
+import { CATEGORIES } from '../constants';
 
 export default function CategoryFilter({
     selected,
