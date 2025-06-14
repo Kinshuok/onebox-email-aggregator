@@ -1,6 +1,7 @@
 import { google } from 'googleapis';
 import dotenv from 'dotenv';
-dotenv.config();
+import path from "path";
+dotenv.config({ path: path.resolve('/Users/kinshuokmunjal/Desktop/reachinbox-onebox/src/.env') });
 
 const { CLIENT_ID, CLIENT_SECRET, REDIRECT_URI } = process.env!;
 

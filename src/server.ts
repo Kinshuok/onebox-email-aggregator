@@ -67,7 +67,7 @@ const PORT = process.env.PORT || 3000;
                         console.log(`✉️ ${emailObj.subject} → ${category}`);
                     }
                 );
-
+                res.redirect(`http://localhost:5173/?account=${email}`);
                 res.send(`Connected & syncing ${email}`);
             } catch (err) {
                 // forward to error handler
@@ -94,6 +94,7 @@ const PORT = process.env.PORT || 3000;
                 body: {
                     query: { bool: { must, ...(filters.length ? { filter: filters } : {}) } },
                     sort: [{ date: { order: 'asc' } }],
+                    size:10000
                 },
             });
             const hits = (result.body as any).hits.hits.map((h: any) => h._source);

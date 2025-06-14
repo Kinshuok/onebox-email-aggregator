@@ -1,10 +1,15 @@
 // src/ai.ts
-import dotenv from 'dotenv';
 import Groq from 'groq-sdk';
+import path from 'path';
+import dotenv from 'dotenv';
+dotenv.config({ path: path.resolve('/Users/kinshuokmunjal/Desktop/reachinbox-onebox/src/.env') });
 
-dotenv.config();
+console.log("DEBUG: GROQ_API_KEY =", process.env.GROQ_API_KEY);  // Must print actual key or you'll know it's still broken
+
+
 
 const apiKey = process.env.GROQ_API_KEY;
+console.log(apiKey);
 if (!apiKey) {
     console.warn(
         '[⚠️] GROQ_API_KEY not set—calls to categorizeEmail will be no-ops.'

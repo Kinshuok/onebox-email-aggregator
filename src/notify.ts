@@ -1,8 +1,9 @@
 import { IncomingWebhook } from '@slack/webhook';
 import axios from 'axios';
 import dotenv from 'dotenv';
+import path from "path";
 
-dotenv.config();
+dotenv.config({ path: path.resolve('/Users/kinshuokmunjal/Desktop/reachinbox-onebox/src/.env') });
 
 const slackUrl = process.env.SLACK_WEBHOOK_URL;
 const webhookUrl = process.env.WEBHOOK_URL;

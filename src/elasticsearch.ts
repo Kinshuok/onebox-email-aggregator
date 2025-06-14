@@ -1,7 +1,8 @@
 // src/elasticsearch.ts
 import { Client } from '@elastic/elasticsearch';
 import dotenv from 'dotenv';
-dotenv.config();
+import path from "path";
+dotenv.config({ path: path.resolve('/Users/kinshuokmunjal/Desktop/reachinbox-onebox/src/.env') });
 
 export const es = new Client({
     node: process.env.ELASTIC_URL || 'http://localhost:9200',
