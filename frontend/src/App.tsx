@@ -47,6 +47,7 @@ function App() {
         if (category) params.append("category", category);
 
         const url = `/search?${params.toString()}`;
+
         fetch(url)
             .then(res => res.json())
             .then(data => setEmails(data))
