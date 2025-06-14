@@ -1,5 +1,5 @@
 body {
-    font-family: Arial, sans-serif;
+    font-family: 'Roboto', Arial, sans-serif;
     margin: 0;
     padding: 0;
     background: #fafafa;
@@ -133,4 +133,31 @@ button {
 
 .mb-2 {
     margin-bottom: 0.5rem;
+}
+
+.email-card {
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.email-card:hover {
+    background: #f1f5f9;
+}
+
+.label {
+    background: #e5e7eb;
+    border-radius: 0.25rem;
+}
+
+.star {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1rem;
+    line-height: 1;
+    padding: 0;
+}
+
+.star:hover {
+    color: #2563eb;
 }
